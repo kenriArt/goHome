@@ -1,0 +1,12 @@
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+app
+
+# Папка с настройками GoLand
+.idea/
+
+# Кэш тестов и сборщика
+.gocache/
