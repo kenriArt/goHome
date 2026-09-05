@@ -2,6 +2,7 @@
 package service
 
 import (
+	"GOTRAKER/internal/orders"
 	"GOTRAKER/internal/repository"
 	"fmt"
 	"sync"
@@ -40,4 +41,15 @@ func (s *OrderService) DeliverMany(ids []int) {
 		}(id)
 	}
 	wg.Wait()
+}
+func (s *OrderService) AddOrder(o orders.Order) {
+	s.repo.Add(o)
+}
+
+func (s *OrderService) GetAll() []orders.Order {
+	return s.repo.GetAll()
+}
+
+func (s *OrderService) UpdateOrder(o orders.Order) error {
+	return s.repo.Update(o)
 }

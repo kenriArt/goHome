@@ -1,15 +1,18 @@
 package main
 
 import (
+	apphttp "GOTRAKER/internal/http"
 	"GOTRAKER/internal/orders"
 	"GOTRAKER/internal/repository"
 	"GOTRAKER/internal/service"
-	"fmt"
+	"log"
+	"net/http"
 )
 
 func main() {
 	repo := repository.NewInMemoryOrderRepository()
 	svc := service.NewOrderService(repo)
+	handler := apphttp.NewHandler(svc)
 	repo.Add(orders.Order{
 		ID:          1,
 		Customer:    "Vasya",
@@ -27,11 +30,9 @@ func main() {
 		Address:     "Kazan",
 		IsDelivered: false,
 	})
-	fmt.Println("[Before]")
-	svc.PrintAllOrders()
-
-	svc.DeliverMany([]int{2, 3, 4})
-
-	fmt.Println("\n[After]")
-	svc.PrintAllOrders()
+	log.Println("Сервер запущен на http://localhost:8080")
+	err := http.ListenAndServe(":8080", handler)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
