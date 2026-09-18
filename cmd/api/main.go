@@ -35,4 +35,5 @@ func main() {
 
 	fmt.Println("\n[After]")
 	svc.PrintAllOrders()
+	fmt.Println("[Пошел в пень!]")
 }
