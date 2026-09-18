@@ -7,7 +7,7 @@ import (
 	"fmt"
 )
 
-// ваваыаыавФФФФФФФ
+// ваваыаыавФФФФФФФ4444444
 func main() {
 	repo := repository.NewInMemoryOrderRepository()
 	svc := service.NewOrderService(repo)
