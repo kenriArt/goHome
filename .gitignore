@@ -4,6 +4,7 @@
 *.so
 *.dylib
 app
+.env
 
 # Папка с настройками GoLand
 .idea/
