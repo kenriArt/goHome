@@ -1,19 +1,28 @@
 package main
 
 import (
+	"GOTRAKER/internal/cache"
 	apphttp "GOTRAKER/internal/http"
-	"GOTRAKER/internal/orders"
+	"GOTRAKER/internal/queue"
 	"GOTRAKER/internal/repository"
 	"GOTRAKER/internal/service"
+	"context"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"strconv"
+	"time"
 
 	"github.com/jmoiron/sqlx"
+	"github.com/joho/godotenv"
 )
 
 func main() {
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
 	dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
 		os.Getenv("DB_HOST"),
 		os.Getenv("DB_PORT"),
@@ -21,31 +30,25 @@ func main() {
 		os.Getenv("DB_PASSWORD"),
 		os.Getenv("DB_NAME"),
 	)
-
+	ttl1 := os.Getenv("REDIS_TTL")
+	numTtl, err := strconv.Atoi(ttl1)
+	ttl := time.Duration(numTtl) * time.Minute
 	db, err := sqlx.Connect("postgres", dsn)
 	if err != nil {
 		log.Fatal("не удалось подключиться к БД:", err)
 	}
-	repo := repository.NewPostgresOrderRepo(db)
-	svc := service.NewOrderService(repo)
+	producer := queue.NewProducer(os.Getenv("KAFKA_BROKER"), "orders")
+	repoPostgres := repository.NewPostgresOrderRepo(db)
+	repoInMemory := repository.NewInMemoryOrderRepository()
+	rds := cache.NewRedisCache(os.Getenv("REDIS_ADDR"), "password", ttl*time.Minute)
+
+	svc := service.NewOrderService(repoInMemory, repoPostgres, rds, producer)
 	handler := apphttp.NewHandler(svc)
-	repo.Add(orders.Order{
-		ID:          1,
-		Customer:    "Vasya",
-		Address:     "Moscow",
-		IsDelivered: false})
-	repo.Add(orders.Order{
-		ID:          2,
-		Customer:    "Petya",
-		Address:     "Moscow",
-		IsDelivered: false,
-	})
-	repo.Add(orders.Order{
-		ID:          3,
-		Customer:    "Olya",
-		Address:     "Kazan",
-		IsDelivered: false,
-	})
+	ctx, cnlkafka := context.WithCancel(context.Background())
+	defer cnlkafka()
+	go queue.StartConsumer(ctx)
+	log.Println("🚀 Консьюмер Kafka успешно запущен в фоновой горутине...")
+
 	log.Println("Сервер запущен на http://localhost:8080")
 	if err := http.ListenAndServe(":8080", handler); err != nil {
 		log.Fatal(err)

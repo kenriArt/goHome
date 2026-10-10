@@ -1,12 +1,16 @@
 package repository
 
 import (
+	"context"
 	"database/sql"
+	"errors"
 	"fmt"
+	"log"
 
 	"GOTRAKER/internal/orders"
 
 	"github.com/jmoiron/sqlx"
+	_ "github.com/lib/pq"
 )
 
 type PostgresOrderRepo struct {
@@ -16,20 +20,28 @@ type PostgresOrderRepo struct {
 func NewPostgresOrderRepo(db *sqlx.DB) *PostgresOrderRepo {
 	return &PostgresOrderRepo{db: db}
 }
-func (r *PostgresOrderRepo) Add(o orders.Order) error {
+func (r *PostgresOrderRepo) Add(o *orders.Order) error {
 	query := `INSERT INTO orders (id, customer, address, is_delivered) VALUES ($1, $2, $3, $4)`
 	_, err := r.db.Exec(query, o.ID, o.Customer, o.Address, o.IsDelivered)
-	return err
+	if err != nil {
+		log.Printf("❌ Ошибка при INSERT в Postgres для заказа %d: %v", o.ID, err)
+		return err
+	}
+	return nil
 }
 
-func (r *PostgresOrderRepo) GetByID(id int) (orders.Order, error) {
+func (r *PostgresOrderRepo) GetByID(ctx context.Context, id int) (*orders.Order, error) {
+	fmt.Println("из базы")
 	var o orders.Order
 	query := `SELECT id, customer, address, is_delivered FROM orders WHERE id = $1`
-	err := r.db.QueryRow(query, id).Scan(&o.ID, &o.Customer, &o.Address, &o.IsDelivered)
-	if err == sql.ErrNoRows {
-		return o, orders.ErrOrderNotFound
+	err := r.db.GetContext(ctx, &o, query, id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, orders.ErrOrderNotFound
+		}
+		return nil, fmt.Errorf("ошибка при чтении заказа %d из Postgres: %w", id, err)
 	}
-	return o, err
+	return &o, err
 }
 
 func (r *PostgresOrderRepo) Update(o orders.Order) error {

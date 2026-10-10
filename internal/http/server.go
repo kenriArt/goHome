@@ -37,6 +37,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.handleUpdate(w, r)
 		return
 	}
+	if strings.HasPrefix(path, "/orders/") && method == http.MethodGet {
+		h.handleGetByID(w, r)
+		return
+	}
 	http.NotFound(w, r)
 }
 func (h *Handler) handleGetAll(w http.ResponseWriter, r *http.Request) {
@@ -44,8 +48,26 @@ func (h *Handler) handleGetAll(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(orders)
 }
+func (h *Handler) handleGetByID(w http.ResponseWriter, r *http.Request) {
+	parts := strings.Split(r.URL.Path, "/")
+	if len(parts) != 3 {
+		http.Error(w, "Invalid URL", http.StatusBadRequest)
+		return
+	}
+	id, err := strconv.Atoi(parts[2])
+	if err != nil || id <= 0 {
+		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		return
+	}
+	order, err := h.serv.GetByID(r.Context(), id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(order)
+}
 func (h *Handler) handleCreate(w http.ResponseWriter, r *http.Request) {
-	var o orders.Order
+	var o *orders.Order
 	if err := json.NewDecoder(r.Body).Decode(&o); err != nil {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
@@ -54,7 +76,7 @@ func (h *Handler) handleCreate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Missing or invalid fields", http.StatusBadRequest)
 		return
 	}
-	h.serv.AddOrder(o)
+	h.serv.AddOrder(r.Context(), o)
 	w.WriteHeader(http.StatusCreated)
 }
 func (h *Handler) handleUpdate(w http.ResponseWriter, r *http.Request) {
@@ -76,7 +98,7 @@ func (h *Handler) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	o.ID = id
 
-	if err := h.serv.UpdateOrder(o); err != nil {
+	if err := h.serv.UpdateOrder(r.Context(), o); err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}

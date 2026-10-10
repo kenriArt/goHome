@@ -2,18 +2,24 @@
 package service
 
 import (
+	"GOTRAKER/internal/cache"
 	"GOTRAKER/internal/orders"
+	"GOTRAKER/internal/queue"
 	"GOTRAKER/internal/repository"
+	"context"
 	"fmt"
 	"sync"
 )
 
 type OrderService struct {
-	repo repository.OrderRepository
+	repo     repository.OrderRepository
+	postgres *repository.PostgresOrderRepo
+	rds      *cache.RedisCache
+	producer *queue.Producer
 }
 
-func NewOrderService(repo repository.OrderRepository) *OrderService {
-	return &OrderService{repo: repo}
+func NewOrderService(repo repository.OrderRepository, postgres *repository.PostgresOrderRepo, rds *cache.RedisCache, producer *queue.Producer) *OrderService {
+	return &OrderService{repo: repo, postgres: postgres, rds: rds, producer: producer}
 }
 
 func (s *OrderService) PrintAllOrders() {
@@ -42,14 +48,36 @@ func (s *OrderService) DeliverMany(ids []int) {
 	}
 	wg.Wait()
 }
-func (s *OrderService) AddOrder(o orders.Order) {
+func (s *OrderService) AddOrder(ctx context.Context, o *orders.Order) error {
 	s.repo.Add(o)
+	err := s.postgres.Add(o)
+	if err != nil {
+		return err
+	}
+	s.rds.Delete(ctx, o.ID)
+	s.producer.SendOrderCreated(ctx, o)
+	return nil
 }
-
 func (s *OrderService) GetAll() []orders.Order {
 	return s.repo.GetAll()
 }
-
-func (s *OrderService) UpdateOrder(o orders.Order) error {
-	return s.repo.Update(o)
+func (s *OrderService) GetByID(ctx context.Context, id int) (*orders.Order, error) {
+	rds, err := s.rds.Get(ctx, id)
+	if err != nil {
+		res, err := s.postgres.GetByID(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		if err := s.rds.Set(ctx, res); err != nil {
+			return nil, err
+		}
+		return res, nil
+	}
+	return rds, nil
+}
+func (s *OrderService) UpdateOrder(ctx context.Context, o orders.Order) error {
+	s.repo.Update(o)
+	s.postgres.Update(o)
+	s.rds.Delete(ctx, o.ID)
+	return nil
 }
