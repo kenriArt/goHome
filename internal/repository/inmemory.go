@@ -14,10 +14,11 @@ type InMemoryOrderRepository struct {
 func NewInMemoryOrderRepository() *InMemoryOrderRepository {
 	return &InMemoryOrderRepository{orders: make(map[int]orders.Order)}
 }
-func (i *InMemoryOrderRepository) Add(order orders.Order) {
+func (i *InMemoryOrderRepository) Add(order *orders.Order) error {
 	i.mu.Lock()
 	defer i.mu.Unlock()
-	i.orders[order.ID] = order
+	i.orders[order.ID] = *order
+	return nil
 }
 func (i *InMemoryOrderRepository) GetByID(id int) (orders.Order, error) {
 	i.mu.Lock()
