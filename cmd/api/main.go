@@ -18,6 +18,7 @@ import (
 	"github.com/joho/godotenv"
 )
 
+// ваваыаыавФФФФФФФ4444444
 func main() {
 	err := godotenv.Load()
 	if err != nil {
