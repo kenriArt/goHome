@@ -43,8 +43,9 @@ func main() {
 	repoInMemory := repository.NewInMemoryOrderRepository()
 	rds := cache.NewRedisCache(os.Getenv("REDIS_ADDR"), "password", ttl*time.Minute)
 
+	healthService := service.NewHealthService(db, rds)
 	svc := service.NewOrderService(repoInMemory, repoPostgres, rds, producer)
-	handler := apphttp.NewHandler(svc)
+	handler := apphttp.NewHandler(svc, healthService)
 	ctx, cnlkafka := context.WithCancel(context.Background())
 	defer cnlkafka()
 	go queue.StartConsumer(ctx)

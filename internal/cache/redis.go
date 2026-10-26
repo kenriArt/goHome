@@ -48,3 +48,6 @@ func (c *RedisCache) Delete(ctx context.Context, id int) error {
 	key := fmt.Sprintf("order:%d", id)
 	return c.client.Del(ctx, key).Err()
 }
+func (c *RedisCache) Ping(ctx context.Context) error {
+	return c.client.Ping(ctx).Err()
+}

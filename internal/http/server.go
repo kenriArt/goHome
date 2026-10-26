@@ -10,17 +10,28 @@ import (
 )
 
 type Handler struct {
-	serv *service.OrderService
+	serv   *service.OrderService
+	health *service.HealthService
 }
 
-func NewHandler(serv *service.OrderService) *Handler {
-	return &Handler{serv: serv}
+func NewHandler(serv *service.OrderService, health *service.HealthService) *Handler {
+	return &Handler{serv: serv, health: health}
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == "/" && r.Method == http.MethodGet {
 		w.Write([]byte("Добро пожаловать в GoTracker API"))
 		return
+	}
+	if r.URL.Path == "/health" && r.Method == http.MethodGet {
+		result := h.health.Check(r.Context())
+		w.Header().Set("Content-Type", "application/json")
+
+		if result["status"] != "ok" {
+			w.WriteHeader(http.StatusServiceUnavailable)
+		}
+
+		json.NewEncoder(w).Encode(result)
 	}
 	path := r.URL.Path
 	method := r.Method

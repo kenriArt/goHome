@@ -1,19 +1,32 @@
 stages:
   - test
   - build
-
-variables:
-  GO_VERSION: "1.20"
-
-before_script:
-  - go version
+  - docker
 
 test:
   stage: test
+  image: golang:1.26
   script:
     - make test
 
 build:
   stage: build
+  image: golang:1.26
   script:
     - make build
+
+docker_build:
+  stage: docker
+  image: docker:cli
+  services:
+    - name: docker:dind
+      alias: docker
+  variables:
+    DOCKER_TLS_CERTDIR: ""
+    DOCKER_HOST: "tcp://docker:2375"
+  script:
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+    - docker build -t "$CI_REGISTRY_IMAGE:latest" .
+    - docker push "$CI_REGISTRY_IMAGE:latest"
+  only:
+    - main
